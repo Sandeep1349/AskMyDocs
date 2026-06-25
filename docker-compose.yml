@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/app/chroma_store
+    env_file: .env
+    # --workers 1: single process shares in-memory model + LRU cache
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 1
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:80"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  chroma_data:
