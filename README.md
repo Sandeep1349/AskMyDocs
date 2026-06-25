@@ -1,39 +1,82 @@
-# AskMyDocs — RAG Document Q&A
+# AskMyDocs
 
-A speed-optimised Retrieval-Augmented Generation (RAG) app that lets you upload PDFs and ask questions about them. Answers stream in real-time via SSE.
+A RAG (Retrieval-Augmented Generation) document Q&A app. Upload a PDF or TXT file and ask questions about it — answers stream in real time, grounded in your document.
 
-## Performance targets
+## Features
 
-| Metric | Target |
-|--------|--------|
-| First token time (TTFT) | < 1 second |
-| Cache hit (repeat query) | < 100 ms |
-| Server cold-start | < 5 seconds |
+- Upload PDF or TXT documents
+- Ask questions and get AI answers grounded in document content
+- Real-time streaming responses (SSE)
+- Source citations with page numbers and relevance scores
+- Conversational fallback for general questions
+- Persistent chat history per document
+- Animated UI with Atomic-Motion green theme
 
-## Stack
+## Tech Stack
 
-| Component | Choice | Why |
-|-----------|--------|-----|
-| Embedding | `BAAI/bge-small-en-v1.5` | ~20% faster than MiniLM, same 384-dim |
-| LLM | `claude-haiku-4-5-20251001` | 5–10× faster TTFT vs Sonnet |
-| Response | SSE streaming | First token in <1s vs 3–5s wait |
-| Cache | In-process LRU (128 slots) | Repeat queries instant |
-| Vector DB | ChromaDB (HNSW, cosine) | Embedded, no extra service |
-| Backend | FastAPI + Uvicorn | Async, SSE-native |
-| Frontend | React 18 + Vite + Tailwind | Streaming token render |
+| Layer | Technology |
+|-------|-----------|
+| LLM | Groq API — `llama-3.3-70b-versatile` |
+| Embeddings | `BAAI/bge-small-en-v1.5` |
+| Vector DB | ChromaDB (HNSW, cosine similarity) |
+| Backend | FastAPI + Uvicorn (SSE streaming) |
+| Frontend | React 18 + Vite + Tailwind CSS |
+| Chunking | LangChain RecursiveCharacterTextSplitter |
 
-## Quick start (local dev)
+## Project Structure
 
-### 1. Clone and set up environment
-
-```bash
-git clone <repo-url>
-cd AskMyDocs
-cp .env.example .env
-# Edit .env and add your ANTHROPIC_API_KEY
+```
+AskMyDocs/
+├── backend/
+│   ├── main.py           # FastAPI app and endpoints
+│   ├── ingest.py         # PDF parsing, chunking, embedding
+│   ├── retriever.py      # Vector similarity search
+│   ├── llm.py            # Groq streaming
+│   └── chroma_client.py  # ChromaDB connection
+├── frontend/
+│   └── src/
+│       ├── components/   # Dashboard, ChatView, ChatPanel, PDFViewer
+│       ├── hooks/        # useChats (localStorage persistence)
+│       └── api.js        # Backend API calls
+├── private/              # gitignored — your secrets live here
+└── .env.example          # Config template
 ```
 
-### 2. Backend
+## Setup
+
+### 1. Clone the repo
+
+```bash
+git clone https://github.com/Sandeep1349/AskMyDocs.git
+cd AskMyDocs
+```
+
+### 2. Create your private config folder
+
+```bash
+mkdir private
+```
+
+Create `private/.env` (copy from `.env.example` and fill in your key):
+
+```
+GROQ_API_KEY=your_groq_api_key_here
+CHROMA_PERSIST_PATH=./chroma_store
+EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
+LLM_MODEL=llama-3.3-70b-versatile
+CORS_ORIGINS=http://localhost:5174
+CACHE_MAX_SIZE=128
+```
+
+Create `private/.env.local`:
+
+```
+VITE_API_URL=http://localhost:8001
+```
+
+Get a free Groq API key at [console.groq.com](https://console.groq.com).
+
+### 3. Backend
 
 ```bash
 python3 -m venv venv
@@ -41,90 +84,51 @@ source venv/bin/activate
 pip install -r backend/requirements.txt
 
 cd backend
-uvicorn main:app --host 0.0.0.0 --port 8000 --workers 1 --reload
+uvicorn main:app --reload --host 0.0.0.0 --port 8001
 ```
 
-Server boots in ~3s and logs `Model loaded` before accepting requests.
-
-### 3. Frontend
+### 4. Frontend
 
 ```bash
 cd frontend
 npm install
 npm run dev
-# Opens http://localhost:5173
 ```
 
-### 4. Use it
+Open [http://localhost:5174](http://localhost:5174)
 
-1. Drop a PDF or TXT file in the left panel
-2. Ask any question in the chat box
-3. Watch the answer stream in character-by-character
-
-## Docker (full stack)
-
-```bash
-cp .env.example .env
-# Edit .env — add ANTHROPIC_API_KEY
-docker-compose up --build
-# Backend: http://localhost:8000
-# Frontend: http://localhost:5173
-```
-
-## API reference
+## API Reference
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/health` | Health check |
 | POST | `/upload` | Upload PDF or TXT |
-| POST | `/query/stream` | SSE streaming answer (primary) |
-| POST | `/query` | Full JSON answer (fallback) |
-| GET | `/documents` | List ingested documents |
+| POST | `/query/stream` | SSE streaming answer |
+| GET | `/documents` | List uploaded documents |
 | DELETE | `/documents/{filename}` | Remove a document |
-| DELETE | `/cache` | Clear LRU query cache |
+| DELETE | `/cache` | Clear query cache |
 
-## Architecture
+## How It Works
 
 ```
-User
- │
- ▼
-React UI (Vite + Tailwind)
- │  ReadableStream SSE consumer
- │
- ▼
-FastAPI (single uvicorn worker)
- │
- ├─ POST /upload ──► ingest.py ──► PyMuPDF extract ──► bge-small encode (batch=32)
- │                                                    ──► ChromaDB upsert
- │                                                    ──► LRU cache.clear()
- │
- └─ POST /query/stream ──► retriever.py ──► LRU cache hit? ──► return instantly
-                                        └─► bge-small encode ──► ChromaDB cosine query
-                                            ──► llm.py ──► Anthropic Haiku stream
-                                                         ──► SSE token yield
+Upload PDF
+    │
+    ▼
+PyMuPDF extract text → chunk (900 chars, 200 overlap)
+    │
+    ▼
+bge-small-en embeddings → ChromaDB vector store
+    │
+    ▼
+User asks question
+    │
+    ▼
+Embed question → cosine similarity search (top 6 chunks, score ≥ 0.55)
+    │
+    ▼
+Groq llama-3.3-70b streams answer → SSE tokens to browser
 ```
 
-## Environment variables
+## Author
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ANTHROPIC_API_KEY` | required | Your Anthropic API key |
-| `CHROMA_PERSIST_PATH` | `./chroma_store` | ChromaDB storage path |
-| `EMBEDDING_MODEL` | `BAAI/bge-small-en-v1.5` | Sentence-transformer model |
-| `LLM_MODEL` | `claude-haiku-4-5-20251001` | Anthropic model ID |
-| `CORS_ORIGINS` | `http://localhost:5173` | Comma-separated allowed origins |
-| `CACHE_MAX_SIZE` | `128` | LRU cache capacity (slots) |
-
-## Design decisions
-
-- **Single uvicorn worker**: shares the in-memory embedding model and LRU cache across all requests. Add Redis if you need horizontal scale.
-- **bge-small over MiniLM**: same 384-dim space, ~20% faster encode, marginally better MTEB retrieval score.
-- **Haiku for RAG**: the LLM only synthesises retrieved context — quality ceiling is set by retrieval, not model reasoning. Haiku is 5–10× faster than Sonnet for this task.
-- **SSE over WebSocket**: unidirectional, HTTP/1.1 compatible, no upgrade handshake — simpler and lower-latency.
-- **LRU invalidation on upload**: cache clears on every new document upload to prevent stale answers.
-- **FastAPI lifespan hook**: pre-loads the embedding model at startup, eliminating the cold-start spike on the first query.
-
-## Prepared by
-
-Sandeep · [github.com/Sandeep1349](https://github.com/Sandeep1349) · UMass Dartmouth MS Data Science
+Sandeep · [github.com/Sandeep1349](https://github.com/Sandeep1349) · MS Data Science, UMass Dartmouth
