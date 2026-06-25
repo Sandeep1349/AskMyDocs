@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from "react"
 import { uploadFile, listDocuments, deleteDocument } from "../api"
 
-export default function UploadPanel({ onUploaded }) {
+export default function UploadPanel({ onUploaded, onOpenFile }) {
   const [docs, setDocs] = useState([])
   const [uploading, setUploading] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -30,7 +30,7 @@ export default function UploadPanel({ onUploaded }) {
     setStatus(null)
     try {
       const result = await uploadFile(file)
-      setStatus({ type: "success", msg: `Ingested ${result.chunks_stored} chunks from ${result.filename}` })
+      setStatus({ type: "success", msg: `"${result.filename}" uploaded successfully` })
       await refreshDocs()
       onUploaded?.()
     } catch (e) {
@@ -119,20 +119,33 @@ export default function UploadPanel({ onUploaded }) {
               className="flex items-center justify-between gap-2 px-3 py-2
                          bg-slate-800/60 rounded-lg border border-slate-700/50"
             >
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm text-slate-200 truncate">{doc.filename}</p>
-                <p className="text-xs text-slate-500">{doc.chunks} chunks</p>
               </div>
-              <button
-                onClick={() => handleDelete(doc.filename)}
-                title="Remove document"
-                className="shrink-0 text-slate-600 hover:text-red-400 transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => onOpenFile?.(doc.filename)}
+                  title="View document"
+                  className="text-slate-600 hover:text-indigo-400 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => handleDelete(doc.filename)}
+                  title="Remove document"
+                  className="text-slate-600 hover:text-red-400 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
             </li>
           ))}
         </ul>

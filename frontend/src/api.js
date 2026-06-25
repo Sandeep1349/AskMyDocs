@@ -8,13 +8,13 @@ export async function uploadFile(file) {
   return res.json()
 }
 
-export async function askStreaming(question, { onToken, onDone, onError, top_k = 4 }) {
+export async function askStreaming(question, { filename, onToken, onDone, onError, top_k = 3 }) {
   let res
   try {
     res = await fetch(`${BASE}/query/stream`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, top_k }),
+      body: JSON.stringify({ question, top_k, filename: filename ?? null }),
     })
   } catch (err) {
     onError?.(err.message)
@@ -71,6 +71,10 @@ export async function deleteDocument(filename) {
   })
   if (!res.ok) throw new Error(await res.text())
   return res.json()
+}
+
+export function getDocumentFileUrl(filename) {
+  return `${BASE}/documents/${encodeURIComponent(filename)}/file`
 }
 
 export async function clearCache() {

@@ -1,11 +1,28 @@
+# Python
 __pycache__/
 *.py[cod]
 *.egg-info/
-.env
-chroma_store/
 venv/
 .venv/
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Data & uploads
+backend/uploads/
+backend/chroma_store/
+sample_docs/
+
+# Frontend build
+frontend/node_modules/
+frontend/dist/
 node_modules/
 dist/
+
+# OS / editor
 .DS_Store
 *.log
+.idea/
+.vscode/

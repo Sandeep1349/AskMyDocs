@@ -1,0 +1,32 @@
+PRIVATE FILES — DO NOT COMMIT TO GITHUB
+========================================
+All files listed here are excluded via .gitignore.
+
+── Secrets & Configuration ──────────────────────────────
+.env                          Root environment file. Contains GROQ_API_KEY and all
+                              runtime config. Copy .env.example and fill in your values.
+
+frontend/.env.local           Frontend Vite env override. Contains VITE_API_URL
+                              pointing to the backend (e.g. http://localhost:8001).
+
+── Uploaded Documents ───────────────────────────────────
+backend/uploads/              PDFs and TXT files uploaded by the user at runtime.
+                              These are personal/client documents — never commit them.
+
+── Vector Database ──────────────────────────────────────
+backend/chroma_store/         ChromaDB persistence directory. Auto-generated from
+                              uploaded documents. Regenerated on re-ingest.
+
+── Sample Documents ─────────────────────────────────────
+sample_docs/                  Local test documents used during development.
+
+── Dependencies & Build Output ──────────────────────────
+venv/                         Python virtual environment.
+frontend/node_modules/        Node.js packages.
+frontend/dist/                Vite production build output.
+
+── Setup Instructions ───────────────────────────────────
+1. cp .env.example .env
+2. Fill in GROQ_API_KEY in .env
+3. Create frontend/.env.local with:
+       VITE_API_URL=http://localhost:8001

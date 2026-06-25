@@ -1,4 +1,4 @@
-import anthropic
+import groq
 import os
 import json
 from dotenv import load_dotenv
@@ -7,49 +7,72 @@ load_dotenv()
 
 _client = None
 
+SYSTEM = (
+    "You are a helpful document assistant. "
+    "When document context is provided, answer accurately using only that context. "
+    "For greetings or general questions not related to the documents, respond naturally and helpfully."
+)
+
 
 def get_client():
     global _client
     if _client is None:
-        _client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        _client = groq.Groq(api_key=os.getenv("GROQ_API_KEY"))
     return _client
 
 
-def build_prompt(question: str, chunks: list[dict]) -> str:
-    context = "\n\n---\n\n".join(
-        f"[Source: {c['source']}]\n{c['text']}" for c in chunks
-    )
-    return (
-        "Answer using ONLY the context below. If the answer is not "
-        "in the context, say: 'I don't have enough information.'\n\n"
-        f"Context:\n{context}\n\nQuestion: {question}\n\nAnswer:"
-    )
+def build_messages(question: str, chunks: list[dict]) -> list[dict]:
+    if chunks:
+        context = "\n---\n".join(
+            f"[p.{c.get('page', '?')}] {c['text']}" for c in chunks
+        )
+        user_content = (
+            f"Answer using the document context below. "
+            f"If the specific answer isn't in the context, say so.\n\n"
+            f"Context:\n{context}\n\nQuestion: {question}"
+        )
+    else:
+        user_content = question
+
+    return [
+        {"role": "system", "content": SYSTEM},
+        {"role": "user", "content": user_content},
+    ]
 
 
 def stream_answer(question: str, chunks: list[dict]):
     """Generator — yields SSE-formatted data strings."""
-    prompt = build_prompt(question, chunks)
-    model = os.getenv("LLM_MODEL", "claude-haiku-4-5-20251001")
+    model = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
+    messages = build_messages(question, chunks)
 
-    with get_client().messages.stream(
+    stream = get_client().chat.completions.create(
         model=model,
         max_tokens=1024,
-        messages=[{"role": "user", "content": prompt}]
-    ) as stream:
-        for text in stream.text_stream:
+        messages=messages,
+        stream=True,
+    )
+    for chunk in stream:
+        text = chunk.choices[0].delta.content
+        if text:
             yield f"data: {json.dumps({'token': text})}\n\n"
 
-    sources = list(dict.fromkeys(c["source"] for c in chunks))
+    seen: set[tuple] = set()
+    sources = []
+    for c in chunks:
+        key = (c["source"], c.get("page", 1))
+        if key not in seen:
+            seen.add(key)
+            sources.append({"source": c["source"], "page": c.get("page", 1), "score": c["score"]})
     yield f"data: {json.dumps({'done': True, 'sources': sources})}\n\n"
 
 
 def generate_answer(question: str, chunks: list[dict]) -> str:
     """Non-streaming fallback for /query endpoint."""
-    prompt = build_prompt(question, chunks)
-    model = os.getenv("LLM_MODEL", "claude-haiku-4-5-20251001")
-    msg = get_client().messages.create(
+    model = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
+    messages = build_messages(question, chunks)
+    msg = get_client().chat.completions.create(
         model=model,
         max_tokens=1024,
-        messages=[{"role": "user", "content": prompt}]
+        messages=messages,
     )
-    return msg.content[0].text
+    return msg.choices[0].message.content
