@@ -2,7 +2,7 @@ import chromadb
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), "../private/.env"))
 
 _client = None
 _collection = None

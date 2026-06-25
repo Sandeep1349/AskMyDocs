@@ -5,10 +5,8 @@ __pycache__/
 venv/
 .venv/
 
-# Environment / secrets
-.env
-.env.local
-.env.*.local
+# Private folder — all sensitive files live here
+private/
 
 # Data & uploads
 backend/uploads/

@@ -16,7 +16,7 @@ from llm import generate_answer, stream_answer
 from cache import query_cache
 from chroma_client import get_collection
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), "../private/.env"))
 
 UPLOADS_DIR = os.path.join(os.path.dirname(__file__), "uploads")
 os.makedirs(UPLOADS_DIR, exist_ok=True)
